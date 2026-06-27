@@ -42,7 +42,7 @@ import {
   ComposedChart
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
-import { parseNewSheetsData, convertValuesToCSV, parseIndonesianDate, formatIndonesianDate, parseRekapHarianCSV, FALLBACK_REKAP_HARIAN_CSV, RekapMempawahRecord, parseRekapMempawahCSV, FALLBACK_REKAP_MEMPAWA_CSV } from './parser';
+import { parseNewSheetsData, convertValuesToCSV, parseIndonesianDate, formatIndonesianDate, parseRekapHarianCSV, FALLBACK_REKAP_HARIAN_CSV, RekapMempawahRecord, parseRekapMempawahCSV, FALLBACK_REKAP_MEMPAWA_CSV, parseCSVLine } from './parser';
 import { PPLSummary, Table3Record, PPLDailyProgress, Snapshot2359 } from './types';
 
 const DEFAULT_SPREADSHEET_ID = '1UC5Ca8EAj088IhFigDHy-106ijc0k_YGlGUHkVzU2Vs';
@@ -710,7 +710,7 @@ export default function App() {
       let pplCol = 2;
       let pjCol = 7;
       try {
-        const rawHeaders = firstLine.split(',');
+        const rawHeaders = parseCSVLine(firstLine);
         const headers = rawHeaders.map(h => h.replace(/^"|"$/g, '').trim().toLowerCase());
         const idxPpl = headers.findIndex(h => h.includes('ppl') || h.includes('petugas') || h.includes('nama ppl'));
         const idxPj = headers.findIndex(h => h.includes('pj') || h.includes('penanggung'));
@@ -724,7 +724,7 @@ export default function App() {
         const line = lines[i].trim();
         if (!line) continue;
         // Simple splitter, taking care of quotes
-        const cols = line.split(',').map(c => c.replace(/^"|"$/g, '').trim());
+        const cols = parseCSVLine(line).map(c => c.replace(/^"|"$/g, '').trim());
         if (cols.length > Math.max(pplCol, pjCol)) {
           const ppl = cols[pplCol];
           const pj = cols[pjCol];
@@ -747,7 +747,7 @@ export default function App() {
       let pplCol = -1;
       let pjCol = -1;
       try {
-        const rawHeaders = firstLine.split(',');
+        const rawHeaders = parseCSVLine(firstLine);
         const headers = rawHeaders.map(h => h.replace(/^"|"$/g, '').trim().toLowerCase());
         pplCol = headers.findIndex(h => h.includes('ppl') || h.includes('petugas') || h.includes('nama ppl'));
         pjCol = headers.findIndex(h => h.includes('pj') || h.includes('penanggung'));
@@ -759,7 +759,7 @@ export default function App() {
         for (let i = 1; i < lines.length; i++) {
           const line = lines[i].trim();
           if (!line) continue;
-          const cols = line.split(',').map(c => c.replace(/^"|"$/g, '').trim());
+          const cols = parseCSVLine(line).map(c => c.replace(/^"|"$/g, '').trim());
           if (cols.length > Math.max(pplCol, pjCol)) {
             const ppl = cols[pplCol];
             const pj = cols[pjCol];
@@ -813,7 +813,7 @@ export default function App() {
       }
 
       // Final normalization of PJ name
-      if (!pj || pj === '#N/A' || pj === '-' || pj.trim() === '') {
+      if (!pj || pj === '#N/A' || pj === '-' || pj.trim() === '' || !isNaN(Number(pj))) {
         pj = "Belum Terpetakan";
       } else {
         pj = pj.trim();
