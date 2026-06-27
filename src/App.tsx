@@ -42,7 +42,7 @@ import {
   ComposedChart
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
-import { parseNewSheetsData, convertValuesToCSV, parseIndonesianDate, formatIndonesianDate, parseRekapHarianCSV, FALLBACK_REKAP_HARIAN_CSV, RekapMempawahRecord, parseRekapMempawahCSV, FALLBACK_REKAP_MEMPAWA_CSV, parseCSVLine } from './parser';
+import { parseNewSheetsData, convertValuesToCSV, parseIndonesianDate, formatIndonesianDate, parseRekapHarianCSV, parseProgresHarianCSV, FALLBACK_REKAP_HARIAN_CSV, RekapMempawahRecord, parseRekapMempawahCSV, FALLBACK_REKAP_MEMPAWA_CSV, parseCSVLine } from './parser';
 import { PPLSummary, Table3Record, PPLDailyProgress, Snapshot2359 } from './types';
 
 const DEFAULT_SPREADSHEET_ID = '1UC5Ca8EAj088IhFigDHy-106ijc0k_YGlGUHkVzU2Vs';
@@ -400,7 +400,7 @@ export default function App() {
 
   // Parsed 'Progres Harian' Google Sheet
   const progresHarianParsed = useMemo(() => {
-    return parseRekapHarianCSV(progresHarianCSV);
+    return parseProgresHarianCSV(progresHarianCSV);
   }, [progresHarianCSV]);
 
   // Combined and sorted date list from rekap harian + Progres Harian + active date from Google Sheets rekap

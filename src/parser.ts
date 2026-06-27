@@ -544,6 +544,76 @@ export function parseRekapHarianCSV(csvText: string): PPLDailyProgress[] {
   return result;
 }
 
+export function parseProgresHarianCSV(csvText: string): PPLDailyProgress[] {
+  const lines = csvText.split(/\r?\n/);
+  const rawRecords: RekapHarianRecord[] = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    
+    const rawCols = parseCSVLine(line);
+    const cols = rawCols.map(c => c.replace(/^"|"$/g, '').trim());
+    
+    if (cols.length >= 6 && cols[0] && cols[0] !== 'Tanggal' && cols[2]) {
+      const tanggal = cols[0];
+      let pmlName = cols[1] === '#N/A' ? 'Belum Terpetakan' : cols[1];
+      let pplName = cols[2] === '#N/A' ? 'Belum Terpetakan' : cols[2];
+      const submit = parseInt(cols[3], 10) || 0;
+      const draft = parseInt(cols[4], 10) || 0;
+      const total = parseInt(cols[5], 10) || 0;
+      const target = parseInt(cols[6], 10) || total;
+
+      rawRecords.push({ tanggal, pmlName, pplName, submit, draft, total, target });
+    }
+  }
+
+  const pplNameToPmls = new Map<string, Set<string>>();
+  rawRecords.forEach(r => {
+    if (!pplNameToPmls.has(r.pplName)) {
+      pplNameToPmls.set(r.pplName, new Set());
+    }
+    pplNameToPmls.get(r.pplName)!.add(r.pmlName);
+  });
+
+  const duplicatePpls = new Set<string>();
+  pplNameToPmls.forEach((pmls, ppl) => {
+    if (pmls.size > 1) {
+      duplicatePpls.add(ppl);
+    }
+  });
+
+  const getDisambiguatedPplName = (ppl: string, pml: string): string => {
+    if (duplicatePpls.has(ppl)) {
+      return `${ppl} (${pml})`;
+    }
+    return ppl;
+  };
+
+  const result: PPLDailyProgress[] = [];
+
+  rawRecords.forEach(r => {
+    const dName = getDisambiguatedPplName(r.pplName, r.pmlName);
+    const parsedDate = parseAnyDate(r.tanggal);
+    result.push({
+      pplName: dName,
+      pmlName: r.pmlName,
+      mempawahTarget: r.target,
+      dateStr: formatIndonesianDate(parsedDate),
+      date: parsedDate,
+      submit: 0,
+      draft: 0,
+      total: 0,
+      dailySubmit: r.submit,
+      dailyDraft: r.draft,
+      dailyTotal: r.total,
+      isFirstDay: false
+    });
+  });
+
+  return result;
+}
+
 export const FALLBACK_REKAP_HARIAN_CSV = `"Tanggal","Nama PML","Nama PPL","Submit","Draf","Total","Target","PJ"
 "2026-06-27","Dandy","Rima Melati","62","45","107","455","Yulfi Ramanda"
 "2026-06-27","Vika Rizkiani","Nurlan Wahyuni","81","52","133","449","Listio Jati Nandhiko"
