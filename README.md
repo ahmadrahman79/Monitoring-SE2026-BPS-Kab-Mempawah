@@ -1,6 +1,6 @@
-# Prasasti - Monitoring SE2026
+# Monitoring SE2026
 
-Prasasti adalah aplikasi dasbor (dashboard) berbasis web yang dirancang khusus untuk **Monitoring Progres Pendataan Lapangan Sensus Ekonomi 2026 (SE2026)**. Aplikasi ini memberikan visualisasi data secara _real-time_ untuk memantau kinerja Petugas Pendataan Lapangan (PPL) dan Pengawas Menengah Lapangan (PML).
+Monitoring SE2026 adalah aplikasi dasbor (dashboard) berbasis web yang dirancang khusus untuk **Monitoring Progres Pendataan Lapangan Sensus Ekonomi 2026 (SE2026)**. Aplikasi ini memberikan visualisasi data secara _real-time_ untuk memantau kinerja Petugas Pendataan Lapangan (PPL) dan Pengawas Menengah Lapangan (PML).
 
 ## ✨ Fitur Utama
 

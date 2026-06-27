@@ -1264,62 +1264,49 @@ export default function App() {
     <div className="flex flex-col min-h-screen bg-slate-50 font-sans text-slate-900">
       
       {/* Top Header Section */}
-      <header className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between px-4 py-3 bg-white border-b border-slate-200 shrink-0 gap-3">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-blue-600 rounded text-white flex-shrink-0">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2"></path>
-            </svg>
-          </div>
-          <div>
-            <h1 className="text-base sm:text-lg font-bold tracking-tight text-slate-800">
-              Monitoring Progres Pendataan Lapangan
-            </h1>
-            <p className="text-[11px] text-slate-500 flex items-center gap-1.5 font-medium">
-              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse flex-shrink-0"></span> 
-              Terhubung dengan Google Sheets: Rekap Progres Lapangan
-            </p>
-          </div>
+      <header className="sticky top-0 z-50 flex items-start sm:items-center justify-between px-3 py-2 sm:px-4 sm:py-2.5 bg-white/95 backdrop-blur-md border-b border-slate-200 shrink-0 gap-3 shadow-xs">
+        {/* Logo on the left */}
+        <div className="flex-shrink-0 pt-0.5 sm:pt-0">
+          <img src="/logo.png" alt="Logo" className="w-8 h-8 sm:w-10 sm:h-10 object-contain" />
         </div>
 
-        {/* Dynamic header widgets */}
-        <div className="flex flex-wrap items-center gap-2 text-xs self-end sm:self-auto">
-          <div className="flex flex-col items-end mr-2 text-right">
-            <span className="text-slate-400 text-[10px] uppercase font-bold">Update Terakhir</span>
-            <span className="font-mono font-bold text-slate-700">{lastUpdate}</span>
-          </div>
+        {/* Content: Title & Filters */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between w-full gap-2 sm:gap-3">
           
-          <select 
-            value={selectedPml} 
-            onChange={handlePmlChange}
-            className="bg-white border border-slate-350 rounded px-2 py-1 text-xs outline-hidden font-medium text-slate-700 cursor-pointer hover:border-slate-400"
-          >
-            <option value="ALL">PML: Semua Tim</option>
-            {parsedData.pmlList.map(pml => (
-              <option key={pml} value={pml}>{`PML: ${pml}`}</option>
-            ))}
-          </select>
+          {/* Title and Subtitle */}
+          <div className="flex flex-col">
+            <h1 className="text-sm sm:text-base font-bold tracking-tight text-slate-800 leading-tight">
+              Monitoring Pendataan Lapangan Sensus Ekonomi 2026
+            </h1>
+            <p className="text-[10px] sm:text-xs text-slate-500 flex items-center gap-1 font-semibold mt-0.5">
+              <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-500 rounded-full animate-pulse flex-shrink-0"></span> 
+              Garda BPS Kabupaten Mempawah
+            </p>
+          </div>
 
-          <button 
-            onClick={() => fetchSheetData(false)}
-            disabled={isLiveLoading}
-            id="sync-now-btn"
-            className="bg-blue-600 text-white px-3 py-1 rounded text-xs font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors cursor-pointer flex items-center gap-1"
-          >
-            <RefreshCw size={12} className={isLiveLoading ? "animate-spin" : ""} />
-            <span>Sync Now</span>
-          </button>
+          {/* Dynamic header widgets */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <select 
+              value={selectedPml} 
+              onChange={handlePmlChange}
+              className="bg-white border border-slate-300 rounded px-1.5 py-1 sm:px-2 sm:py-1 text-xs sm:text-sm outline-hidden font-medium text-slate-700 cursor-pointer hover:border-slate-400"
+            >
+              <option value="ALL">PML: Semua Tim</option>
+              {parsedData.pmlList.map(pml => (
+                <option key={pml} value={pml}>{`PML: ${pml}`}</option>
+              ))}
+            </select>
 
-          <a 
-            href="https://github.com/ahmadrahman79/Monitoring-SE2026-BPS-Kab-Mempawah"
-            target="_blank"
-            rel="noopener noreferrer"
-            id="github-repo-btn"
-            className="bg-slate-800 text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-slate-900 transition-colors cursor-pointer flex items-center gap-1.5"
-          >
-            <Github size={12} />
-            <span>GitHub Repository</span>
-          </a>
+            <button 
+              onClick={() => fetchSheetData(false)}
+              disabled={isLiveLoading}
+              id="sync-now-btn"
+              className="bg-blue-600 text-white px-2 py-1 sm:px-2.5 sm:py-1 rounded text-xs sm:text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              <RefreshCw size={14} className={isLiveLoading ? "animate-spin" : ""} />
+              <span className="hidden sm:inline">Sync</span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -1346,44 +1333,9 @@ export default function App() {
       {/* Main Content Grid with dynamic layout spacing */}
       <main className="flex-1 p-4 grid grid-cols-12 gap-4">
 
-        {/* Info Explainer ribbon */}
-        <div className="col-span-12 bg-blue-50/50 border border-blue-200/50 p-2.5 rounded-lg flex items-center justify-between text-xs gap-3">
-          <div className="flex items-center gap-2">
-            <Info size={14} className="text-blue-600 flex-shrink-0" />
-            <p className="text-slate-600 font-medium">
-              Aplikasi menghitung <b>Harian (Non-Akumulasi)</b> murni dengan membandingkan entri tanggal berurutan dari Google Sheet.
-            </p>
-          </div>
-          <span className="text-[10px] bg-blue-100 text-blue-800 font-sans font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-            Smart Delta Mode
-          </span>
-        </div>
 
-        {/* WIB 23:59 Cutoff Panel */}
-        <div className="col-span-12 bg-slate-900 text-white p-4 rounded-xl border border-slate-800 hover:border-slate-750 transition-all shadow-md flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-          <div className="flex items-start sm:items-center gap-3">
-            <div className="p-2.5 bg-cyan-500/10 text-cyan-400 rounded-lg shrink-0">
-              <Clock size={20} className="animate-pulse" />
-            </div>
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[10px] uppercase font-black tracking-widest text-[#00E5FF]">WIB Timed Pipeline</span>
-                <span className="text-[9px] bg-slate-800 text-slate-300 font-bold px-2 py-0.5 rounded border border-slate-700">Autocommit WIB 23:59 Cutoff</span>
-              </div>
-              <h3 className="text-xs sm:text-sm font-bold mt-1 text-slate-100">
-                Alokasi Tanggal Aktif: <span className="text-[#00E5FF] font-black">{getWIBTargetDateStr()}</span>
-              </h3>
-              <p className="text-[11px] text-slate-450 mt-0.5 font-medium leading-relaxed">
-                Waktu WIB Online: <span className="font-mono text-cyan-200 font-bold">{currentWIBTime.toLocaleTimeString('id-ID', { hour12: false })} WIB</span>.
-                {currentWIBTime.getHours() === 23 && currentWIBTime.getMinutes() >= 55 ? (
-                  <span className="text-rose-400 ml-1.5 font-bold animate-pulse">⚠️ Perhatian: mendekati cutoff 23:59 WIB harian!</span>
-                ) : (
-                  <span className="text-slate-400 ml-1.5 font-sans font-medium">Entri yang di-update setelah pukul 23:59 WIB otomatis dikelompokkan ke tanggal berikutnya.</span>
-                )}
-              </p>
-            </div>
-          </div>
-        </div>
+
+
 
         {/* Dynamic Filter Row */}
         <div className="col-span-12 bg-white border border-slate-205 p-3 rounded-lg flex flex-wrap gap-3 items-center justify-between shadow-2xs">
@@ -2542,17 +2494,29 @@ export default function App() {
       </main>
 
       {/* Footer Bar consistent with the design specification */}
-      <footer className="bg-slate-800 text-slate-400 px-4 py-3 flex flex-col sm:flex-row justify-between items-center text-[10px] shrink-0 gap-2 mt-8 border-t border-slate-900">
-        <div className="flex flex-wrap gap-4 justify-center sm:justify-start">
-          <span>ID Spreadsheet: <b className="font-mono text-slate-200">{spreadsheetId}</b></span>
-          <span>•</span>
-          <span>Sheet Aktif: <b className="text-slate-200">rekap & data lama</b></span>
-          <span>•</span>
-          <span>Repository: <a href="https://github.com/ahmadrahman79/Monitoring-SE2026-BPS-Kab-Mempawah" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline hover:text-blue-300">ahmadrahman79/Monitoring-SE2026-BPS-Kab-Mempawah</a></span>
+      <footer className="bg-[#F58220] text-white px-4 py-3 flex flex-col sm:flex-row justify-between items-center text-xs shrink-0 gap-3 mt-8">
+        <div className="flex flex-wrap gap-4 justify-center sm:justify-start items-center">
+          <a 
+            href="https://github.com/ahmadrahman79/Prasasti-SE2026"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-slate-800 text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-slate-900 transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
+          >
+            <Github size={14} />
+            <span>GitHub Repository</span>
+          </a>
+          <span className="hidden sm:inline text-white/50">•</span>
+          <span className="flex items-center gap-1.5 text-white/90">
+            <Clock size={12} className="text-white shrink-0" />
+            <span>Alokasi Tanggal: <b className="font-bold text-white">{getWIBTargetDateStr()}</b> ({currentWIBTime.toLocaleTimeString('id-ID', { hour12: false })} WIB)</span>
+          </span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse"></span>
-          <span>Otomasi Sync: <b className="text-green-400 font-bold text-[9px] uppercase tracking-wider">AKTIF (30m)</b></span>
+        <div className="flex items-center gap-3">
+          <span className="text-white/90">Update: <b className="font-mono text-white">{lastUpdate}</b></span>
+          <div className="flex items-center gap-1.5 bg-black/10 px-2 py-1 rounded">
+            <span className="w-2.5 h-2.5 bg-[#00E5FF] rounded-full animate-pulse"></span>
+            <span>Otomasi Sync: <b className="text-[#00E5FF] font-bold text-[10px] uppercase tracking-wider">AKTIF (30m)</b></span>
+          </div>
         </div>
       </footer>
 
