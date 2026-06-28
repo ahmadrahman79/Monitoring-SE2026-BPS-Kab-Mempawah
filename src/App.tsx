@@ -966,7 +966,7 @@ export default function App() {
   // Reset page when Mempawah filters or sorting change
   useEffect(() => {
     setMempawahTablePage(1);
-  }, [selectedMempawahPjFilter, selectedMempawahDesaFilter, selectedMempawahKecFilter, selectedMempawahSlsFilter, mempawahSortOrder]);
+  }, [selectedMempawahPjFilter, selectedMempawahDesaFilter, selectedMempawahKecFilter, selectedMempawahSlsFilter, mempawahSortColumn, mempawahSortDirection]);
 
   // Dynamic PML Groups for bottom recap comparison card tables
   const pmlGroups = useMemo<Record<string, { pplName: string; submit: number; draft: number; total: number; progress: number; mempawahTarget: number }[]>>(() => {
