@@ -222,12 +222,16 @@ export default function App() {
 
   // PJ and Rekap Mempawah Table Filter States
   const [selectedPjFilter, setSelectedPjFilter] = useState<string>('ALL');
-  const [pjSortOrder, setPjSortOrder] = useState<string>('NONE'); // 'NONE' | 'ASC' | 'DESC'
+  const [pjSortColumn, setPjSortColumn] = useState<string>('progress'); // 'pj' | 'submit' | 'draft' | 'total' | 'target' | 'progress'
+  const [pjSortDirection, setPjSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [pjItemsPerPage, setPjItemsPerPage] = useState<number>(10);
+  
   const [selectedMempawahPjFilter, setSelectedMempawahPjFilter] = useState<string>('ALL');
   const [selectedMempawahDesaFilter, setSelectedMempawahDesaFilter] = useState<string>('ALL');
   const [selectedMempawahKecFilter, setSelectedMempawahKecFilter] = useState<string>('ALL');
   const [selectedMempawahSlsFilter, setSelectedMempawahSlsFilter] = useState<string>('ALL');
-  const [mempawahSortOrder, setMempawahSortOrder] = useState<string>('NONE'); // 'NONE' | 'ASC' | 'DESC'
+  const [mempawahSortColumn, setMempawahSortColumn] = useState<string>('progress'); // 'pj' | 'kecamatan' | 'desa' | 'sls' | 'submit' | 'draft' | 'total' | 'target' | 'progress'
+  const [mempawahSortDirection, setMempawahSortDirection] = useState<'asc' | 'desc'>('desc');
 
   // Pagination pages
   const [pjTablePage, setPjTablePage] = useState<number>(1);
@@ -846,22 +850,22 @@ export default function App() {
       records = records.filter(rec => rec.pj === selectedPjFilter);
     }
     
-    if (pjSortOrder === 'ASC') {
-      records = [...records].sort((a, b) => {
-        const pctA = a.target > 0 ? (a.submit / a.target) : 0;
-        const pctB = b.target > 0 ? (b.submit / b.target) : 0;
-        return pctA - pctB;
-      });
-    } else if (pjSortOrder === 'DESC') {
-      records = [...records].sort((a, b) => {
-        const pctA = a.target > 0 ? (a.submit / a.target) : 0;
-        const pctB = b.target > 0 ? (b.submit / b.target) : 0;
-        return pctB - pctA;
-      });
-    }
+    records = [...records].sort((a, b) => {
+      let valA: any = a[pjSortColumn as keyof typeof a];
+      let valB: any = b[pjSortColumn as keyof typeof b];
+      
+      if (pjSortColumn === 'progress') {
+        valA = a.target > 0 ? (a.submit / a.target) : 0;
+        valB = b.target > 0 ? (b.submit / b.target) : 0;
+      }
+      
+      if (valA < valB) return pjSortDirection === 'asc' ? -1 : 1;
+      if (valA > valB) return pjSortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
     
     return records;
-  }, [pjTableRecords, selectedPjFilter, pjSortOrder]);
+  }, [pjTableRecords, selectedPjFilter, pjSortColumn, pjSortDirection]);
 
   const pjTableTotals = useMemo(() => {
     let submit = 0;
@@ -892,9 +896,14 @@ export default function App() {
     
     parsedMempawahRecords.forEach(rec => {
       if (rec.pj) pjs.add(rec.pj);
-      if (rec.desa) desas.add(rec.desa);
       if (rec.kecamatan) kecamatans.add(rec.kecamatan);
-      if (rec.sls) slss.add(rec.sls);
+      
+      // Hierarchical filtering logic
+      const matchKec = selectedMempawahKecFilter === 'ALL' || rec.kecamatan === selectedMempawahKecFilter;
+      const matchDesa = selectedMempawahDesaFilter === 'ALL' || rec.desa === selectedMempawahDesaFilter;
+
+      if (matchKec && rec.desa) desas.add(rec.desa);
+      if (matchKec && matchDesa && rec.sls) slss.add(rec.sls);
     });
     
     return {
@@ -903,7 +912,7 @@ export default function App() {
       kecamatans: Array.from(kecamatans).sort(),
       slss: Array.from(slss).sort()
     };
-  }, [parsedMempawahRecords]);
+  }, [parsedMempawahRecords, selectedMempawahKecFilter, selectedMempawahDesaFilter]);
 
   const filteredMempawahRecords = useMemo(() => {
     let records = parsedMempawahRecords.filter(rec => {
@@ -914,22 +923,22 @@ export default function App() {
       return matchPj && matchDesa && matchKec && matchSls;
     });
 
-    if (mempawahSortOrder === 'ASC') {
-      records = [...records].sort((a, b) => {
-        const pctA = a.target > 0 ? (a.submit / a.target) : 0;
-        const pctB = b.target > 0 ? (b.submit / b.target) : 0;
-        return pctA - pctB;
-      });
-    } else if (mempawahSortOrder === 'DESC') {
-      records = [...records].sort((a, b) => {
-        const pctA = a.target > 0 ? (a.submit / a.target) : 0;
-        const pctB = b.target > 0 ? (b.submit / b.target) : 0;
-        return pctB - pctA;
-      });
-    }
+    records = [...records].sort((a, b) => {
+      let valA: any = a[mempawahSortColumn as keyof typeof a];
+      let valB: any = b[mempawahSortColumn as keyof typeof b];
+      
+      if (mempawahSortColumn === 'progress') {
+        valA = a.target > 0 ? (a.submit / a.target) : 0;
+        valB = b.target > 0 ? (b.submit / b.target) : 0;
+      }
+      
+      if (valA < valB) return mempawahSortDirection === 'asc' ? -1 : 1;
+      if (valA > valB) return mempawahSortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
 
     return records;
-  }, [parsedMempawahRecords, selectedMempawahPjFilter, selectedMempawahDesaFilter, selectedMempawahKecFilter, selectedMempawahSlsFilter, mempawahSortOrder]);
+  }, [parsedMempawahRecords, selectedMempawahPjFilter, selectedMempawahDesaFilter, selectedMempawahKecFilter, selectedMempawahSlsFilter, mempawahSortColumn, mempawahSortDirection]);
 
   const mempawahTotals = useMemo(() => {
     let submit = 0;
@@ -2044,13 +2053,13 @@ export default function App() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-slate-200/60">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-3 border-t border-slate-200/60">
               {/* PJ name filter */}
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide">Filter Nama PJ:</span>
                 <select
                   value={selectedPjFilter}
-                  onChange={(e) => setSelectedPjFilter(e.target.value)}
+                  onChange={(e) => { setSelectedPjFilter(e.target.value); setPjTablePage(1); }}
                   className="bg-white border border-slate-200 rounded px-2 py-1 text-xs text-slate-700 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/10 outline-hidden transition-all cursor-pointer w-full"
                 >
                   <option value="ALL">Semua PJ</option>
@@ -2060,17 +2069,48 @@ export default function App() {
                 </select>
               </div>
 
-              {/* Progress sorting filter */}
+              {/* Column Sort Filter */}
               <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide">Urutkan Progres:</span>
+                <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide">Urutkan Kolom:</span>
                 <select
-                  value={pjSortOrder}
-                  onChange={(e) => setPjSortOrder(e.target.value)}
+                  value={pjSortColumn}
+                  onChange={(e) => setPjSortColumn(e.target.value)}
                   className="bg-white border border-slate-200 rounded px-2 py-1 text-xs text-slate-700 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/10 outline-hidden transition-all cursor-pointer w-full"
                 >
-                  <option value="NONE">Bawaan (Default)</option>
-                  <option value="ASC">Terkecil → Terbesar</option>
-                  <option value="DESC">Terbesar → Terkecil</option>
+                  <option value="progress">Persentase (Default)</option>
+                  <option value="pj">Nama PJ</option>
+                  <option value="submit">Jumlah Submit</option>
+                  <option value="draft">Jumlah Draf</option>
+                  <option value="total">Total Gabungan</option>
+                  <option value="target">Jumlah Target</option>
+                </select>
+              </div>
+
+              {/* Direction Sort Filter */}
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide">Arah Urutan:</span>
+                <select
+                  value={pjSortDirection}
+                  onChange={(e) => setPjSortDirection(e.target.value as 'asc'|'desc')}
+                  className="bg-white border border-slate-200 rounded px-2 py-1 text-xs text-slate-700 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/10 outline-hidden transition-all cursor-pointer w-full"
+                >
+                  <option value="desc">Terbesar ke Terkecil</option>
+                  <option value="asc">Terkecil ke Terbesar</option>
+                </select>
+              </div>
+
+              {/* Limit items Filter */}
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide">Tampilkan Baris:</span>
+                <select
+                  value={pjItemsPerPage}
+                  onChange={(e) => { setPjItemsPerPage(Number(e.target.value)); setPjTablePage(1); }}
+                  className="bg-white border border-slate-200 rounded px-2 py-1 text-xs text-slate-700 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/10 outline-hidden transition-all cursor-pointer w-full"
+                >
+                  <option value={10}>10 Baris</option>
+                  <option value={25}>25 Baris</option>
+                  <option value={50}>50 Baris</option>
+                  <option value={999999}>Semua Baris</option>
                 </select>
               </div>
             </div>
@@ -2090,7 +2130,7 @@ export default function App() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredPjRecords.length > 0 ? (
-                  filteredPjRecords.map((rec, idx) => {
+                  filteredPjRecords.slice((pjTablePage - 1) * pjItemsPerPage, pjTablePage * pjItemsPerPage).map((rec, idx) => {
                     const pct = rec.target > 0 ? parseFloat(((rec.submit / rec.target) * 100).toFixed(1)) : 0;
                     
                     return (
@@ -2139,6 +2179,34 @@ export default function App() {
               </tbody>
             </table>
           </div>
+
+          {/* PJ Table Pagination Footer */}
+          {filteredPjRecords.length > 0 && (
+            <div className="p-3 bg-slate-50/70 border-t border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-slate-500 font-semibold">
+              <div>
+                Menampilkan <span className="text-slate-800 font-bold">{(pjTablePage - 1) * pjItemsPerPage + 1}</span> - <span className="text-slate-800 font-bold">{Math.min(pjTablePage * pjItemsPerPage, filteredPjRecords.length)}</span> dari <span className="text-slate-800 font-bold">{filteredPjRecords.length}</span> PJ
+              </div>
+              <div className="flex gap-1.5">
+                <button
+                  disabled={pjTablePage === 1}
+                  onClick={() => setPjTablePage(prev => Math.max(1, prev - 1))}
+                  className="px-2.5 py-1 bg-white border border-slate-250 rounded hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white text-slate-755 font-bold transition-all disabled:cursor-not-allowed cursor-pointer"
+                >
+                  Sebelumnya
+                </button>
+                <div className="flex items-center px-1 text-slate-700 font-sans font-bold text-[11px]">
+                  Halaman {pjTablePage} / {Math.ceil(filteredPjRecords.length / pjItemsPerPage) || 1}
+                </div>
+                <button
+                  disabled={pjTablePage === (Math.ceil(filteredPjRecords.length / pjItemsPerPage) || 1)}
+                  onClick={() => setPjTablePage(prev => Math.min((Math.ceil(filteredPjRecords.length / pjItemsPerPage) || 1), prev + 1))}
+                  className="px-2.5 py-1 bg-white border border-slate-250 rounded hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white text-slate-755 font-bold transition-all disabled:cursor-not-allowed cursor-pointer"
+                >
+                  Selanjutnya
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Table 2: Rekap Progres Geografis */}
@@ -2153,13 +2221,13 @@ export default function App() {
             </div>
             
             {/* Multiple Filters Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 mt-4 pt-4 border-t border-slate-200/60">
+            <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-4 pt-4 border-t border-slate-200/60">
               {/* PJ filter */}
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide">Filter PJ:</span>
                 <select
                   value={selectedMempawahPjFilter}
-                  onChange={(e) => setSelectedMempawahPjFilter(e.target.value)}
+                  onChange={(e) => { setSelectedMempawahPjFilter(e.target.value); setMempawahTablePage(1); }}
                   className="bg-white border border-slate-200 rounded px-2 py-1 text-xs text-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/10 outline-hidden transition-all cursor-pointer w-full"
                 >
                   <option value="ALL">Semua PJ</option>
@@ -2174,7 +2242,12 @@ export default function App() {
                 <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide">Filter Kecamatan:</span>
                 <select
                   value={selectedMempawahKecFilter}
-                  onChange={(e) => setSelectedMempawahKecFilter(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedMempawahKecFilter(e.target.value);
+                    setSelectedMempawahDesaFilter('ALL');
+                    setSelectedMempawahSlsFilter('ALL');
+                    setMempawahTablePage(1);
+                  }}
                   className="bg-white border border-slate-200 rounded px-2 py-1 text-xs text-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/10 outline-hidden transition-all cursor-pointer w-full"
                 >
                   <option value="ALL">Semua Kecamatan</option>
@@ -2189,7 +2262,11 @@ export default function App() {
                 <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide">Filter Desa:</span>
                 <select
                   value={selectedMempawahDesaFilter}
-                  onChange={(e) => setSelectedMempawahDesaFilter(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedMempawahDesaFilter(e.target.value);
+                    setSelectedMempawahSlsFilter('ALL');
+                    setMempawahTablePage(1);
+                  }}
                   className="bg-white border border-slate-200 rounded px-2 py-1 text-xs text-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/10 outline-hidden transition-all cursor-pointer w-full"
                 >
                   <option value="ALL">Semua Desa</option>
@@ -2204,7 +2281,7 @@ export default function App() {
                 <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide">Filter SLS:</span>
                 <select
                   value={selectedMempawahSlsFilter}
-                  onChange={(e) => setSelectedMempawahSlsFilter(e.target.value)}
+                  onChange={(e) => { setSelectedMempawahSlsFilter(e.target.value); setMempawahTablePage(1); }}
                   className="bg-white border border-slate-200 rounded px-2 py-1 text-xs text-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/10 outline-hidden transition-all cursor-pointer w-full"
                 >
                   <option value="ALL">Semua SLS</option>
@@ -2214,17 +2291,36 @@ export default function App() {
                 </select>
               </div>
 
-              {/* Progress sort filter */}
+              {/* Column Sort Filter */}
               <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide">Urutkan Progres:</span>
+                <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide">Urutkan Kolom:</span>
                 <select
-                  value={mempawahSortOrder}
-                  onChange={(e) => setMempawahSortOrder(e.target.value)}
+                  value={mempawahSortColumn}
+                  onChange={(e) => setMempawahSortColumn(e.target.value)}
                   className="bg-white border border-slate-200 rounded px-2 py-1 text-xs text-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/10 outline-hidden transition-all cursor-pointer w-full"
                 >
-                  <option value="NONE">Bawaan (Default)</option>
-                  <option value="ASC">Terkecil → Terbesar</option>
-                  <option value="DESC">Terbesar → Terkecil</option>
+                  <option value="progress">Persentase (Default)</option>
+                  <option value="kecamatan">Kecamatan</option>
+                  <option value="desa">Desa</option>
+                  <option value="sls">SLS</option>
+                  <option value="pj">Nama PJ</option>
+                  <option value="submit">Jumlah Submit</option>
+                  <option value="draft">Jumlah Draf</option>
+                  <option value="total">Total Gabungan</option>
+                  <option value="target">Jumlah Target</option>
+                </select>
+              </div>
+
+              {/* Direction Sort Filter */}
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide">Arah Urutan:</span>
+                <select
+                  value={mempawahSortDirection}
+                  onChange={(e) => setMempawahSortDirection(e.target.value as 'asc'|'desc')}
+                  className="bg-white border border-slate-200 rounded px-2 py-1 text-xs text-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/10 outline-hidden transition-all cursor-pointer w-full"
+                >
+                  <option value="desc">Terbesar ke Terkecil</option>
+                  <option value="asc">Terkecil ke Terbesar</option>
                 </select>
               </div>
             </div>
