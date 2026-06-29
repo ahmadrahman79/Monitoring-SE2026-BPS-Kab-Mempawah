@@ -290,6 +290,8 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [bottomTablePage, setBottomTablePage] = useState<number>(1);
   const [bottomTableSortConfig, setBottomTableSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' | null }>({ key: '', direction: null });
+  const [pmlTablePage, setPmlTablePage] = useState<number>(1);
+  const [pmlTableSortConfig, setPmlTableSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' | null }>({ key: '', direction: null });
   const [dailyLogPage, setDailyLogPage] = useState<number>(1);
   const [targetTrackerPpl, setTargetTrackerPpl] = useState<string>('');
   const [localPplFilter, setLocalPplFilter] = useState<string>('');
@@ -342,10 +344,11 @@ export default function App() {
   const [tableTab, setTableTab] = useState<'daily' | 'cumulative'>('daily');
   const [leaderboardTab, setLeaderboardTab] = useState<'most' | 'least'>('most');
 
-  // Reset page sizes on filter change
+  // Reset bottomTable and pmlTable page to 1 when active PML/PPL filters change
   useEffect(() => {
     setBottomTablePage(1);
-  }, [selectedPml]);
+    setPmlTablePage(1);
+  }, [selectedPml, selectedPpl]);
 
   useEffect(() => {
     setDailyLogPage(1);
@@ -1151,6 +1154,49 @@ export default function App() {
     return list;
   }, [pmlGroups, selectedPml, bottomTableSortConfig]);
 
+  // Combine and sort data for the new Per PML table
+  const pmlTableData = useMemo(() => {
+    const list: { pmlName: string; submit: number; draft: number; total: number; progress: number; mempawahTarget: number }[] = [];
+    (Object.entries(pmlSubTotals)).forEach(([pmlName, totals]) => {
+      if (selectedPml !== 'ALL' && pmlName !== selectedPml) {
+        return;
+      }
+      list.push({
+        pmlName,
+        ...totals
+      });
+    });
+    
+    // Sort logic
+    if (pmlTableSortConfig.key && pmlTableSortConfig.direction) {
+      list.sort((a, b) => {
+        let valA: any = a[pmlTableSortConfig.key as keyof typeof a];
+        let valB: any = b[pmlTableSortConfig.key as keyof typeof b];
+        
+        if (typeof valA === 'string' && typeof valB === 'string') {
+          return pmlTableSortConfig.direction === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        } else if (typeof valA === 'number' && typeof valB === 'number') {
+          return pmlTableSortConfig.direction === 'asc' ? valA - valB : valB - valA;
+        }
+        return 0;
+      });
+    } else {
+      // Default sort by PML Name
+      list.sort((a, b) => a.pmlName.localeCompare(b.pmlName));
+    }
+    return list;
+  }, [pmlSubTotals, selectedPml, pmlTableSortConfig]);
+
+  // Paginated PML table data
+  const paginatedPmlTableData = useMemo(() => {
+    const startIndex = (pmlTablePage - 1) * 10;
+    return pmlTableData.slice(startIndex, startIndex + 10);
+  }, [pmlTableData, pmlTablePage]);
+
+  const totalPmlTablePages = useMemo(() => {
+    return Math.ceil(pmlTableData.length / 10) || 1;
+  }, [pmlTableData]);
+
   // Paginated bottom table data
   const paginatedBottomTableData = useMemo(() => {
     const startIndex = (bottomTablePage - 1) * 10;
@@ -1371,6 +1417,29 @@ export default function App() {
     if (bottomTableSortConfig.key !== columnKey || !bottomTableSortConfig.direction) return <ChevronsUpDown size={12} className="opacity-30 inline-block ml-1" />;
     if (bottomTableSortConfig.direction === 'asc') return <ChevronUp size={12} className="text-blue-600 inline-block ml-1" />;
     return <ChevronDown size={12} className="text-blue-600 inline-block ml-1" />;
+  };
+
+  const handlePmlTableSort = (key: string) => {
+    let direction: 'asc' | 'desc' | null = 'desc';
+    if (pmlTableSortConfig.key === key) {
+      if (pmlTableSortConfig.direction === 'desc') {
+        direction = 'asc';
+      } else if (pmlTableSortConfig.direction === 'asc') {
+        direction = null;
+      } else {
+        direction = 'desc';
+      }
+    } else {
+      direction = ['submit', 'draft', 'mempawahTarget', 'progress'].includes(key) ? 'desc' : 'asc';
+    }
+    setPmlTableSortConfig({ key, direction });
+  };
+
+  const renderPmlSortIcon = (columnKey: string) => {
+    if (pmlTableSortConfig.key !== columnKey) return <span className="text-slate-300 ml-1">↕</span>;
+    if (pmlTableSortConfig.direction === 'asc') return <span className="text-blue-600 ml-1">↑</span>;
+    if (pmlTableSortConfig.direction === 'desc') return <span className="text-blue-600 ml-1">↓</span>;
+    return <span className="text-slate-300 ml-1">↕</span>;
   };
 
   const handlePjTableSort = (key: string) => {
@@ -2083,7 +2152,7 @@ export default function App() {
             <div>
               <h3 className="text-xs sm:text-sm font-black text-slate-705 uppercase flex items-center gap-2">
                 <Users size={15} className="text-blue-600" />
-                Table Akumulasi Progres Petugas (Per PML)
+                Table Akumulasi Progres Petugas (Per PPL)
               </h3>
               <p className="text-[11px] text-slate-500 font-medium">Informasi menyeluruh penyelesaian target untuk seluruh tim lapangan berdasarkan rekap terkini</p>
             </div>
@@ -2181,6 +2250,114 @@ export default function App() {
                 <button
                   disabled={bottomTablePage === totalBottomTablePages}
                   onClick={() => setBottomTablePage(prev => Math.min(totalBottomTablePages, prev + 1))}
+                  className="px-2.5 py-1 bg-white border border-slate-250 rounded hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white text-slate-755 font-bold transition-all disabled:cursor-not-allowed cursor-pointer"
+                >
+                  Selanjutnya
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Bottom Section: Unified Akumulasi Table (Per PML) */}
+        <div className="col-span-12 bg-white rounded-lg border border-slate-200 flex flex-col shadow-2xs overflow-hidden mt-4">
+          <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div>
+              <h3 className="text-xs sm:text-sm font-black text-slate-705 uppercase flex items-center gap-2">
+                <Users size={15} className="text-blue-600" />
+                Table Akumulasi Progres Petugas (Per PML)
+              </h3>
+              <p className="text-[11px] text-slate-500 font-medium">Informasi menyeluruh penyelesaian target diagregasi pada tingkat Supervisor/PML</p>
+            </div>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full text-[11px] text-left border-collapse">
+              <thead className="bg-slate-50 border-b border-slate-150">
+                <tr className="text-slate-500 uppercase tracking-wider font-extrabold text-[10px]">
+                  <th className="p-3 pl-4 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handlePmlTableSort('pmlName')}>
+                    PML Supervisor {renderPmlSortIcon('pmlName')}
+                  </th>
+                  <th className="p-3 text-center cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handlePmlTableSort('submit')}>
+                    Submit {renderPmlSortIcon('submit')}
+                  </th>
+                  <th className="p-3 text-center cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handlePmlTableSort('draft')}>
+                    Draft {renderPmlSortIcon('draft')}
+                  </th>
+                  <th className="p-3 text-center cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handlePmlTableSort('mempawahTarget')}>
+                    Target (Kolom F) {renderPmlSortIcon('mempawahTarget')}
+                  </th>
+                  <th className="p-3 text-right pr-6 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handlePmlTableSort('progress')}>
+                    Progres (%) {renderPmlSortIcon('progress')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-mono text-slate-700">
+                {paginatedPmlTableData.length > 0 ? (
+                  paginatedPmlTableData.map((pml, index) => (
+                    <tr key={pml.pmlName} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="p-2.5 pl-4 font-sans font-bold text-slate-600">{pml.pmlName}</td>
+                      <td className="p-2.5 text-center font-bold text-slate-800">{pml.submit}</td>
+                      <td className="p-2.5 text-center text-slate-400">{pml.draft}</td>
+                      <td className="p-2.5 text-center">{pml.mempawahTarget}</td>
+                      <td className="p-2.5 text-right pr-6 font-bold text-blue-600">
+                        <div className="inline-flex items-center gap-1.5 justify-end w-full">
+                          <span className="text-[11px] font-bold text-slate-700">{pml.progress}%</span>
+                          <div className="w-12 bg-slate-100 rounded-full h-1.5 overflow-hidden hidden sm:block">
+                            <div 
+                              className="bg-blue-600 h-full rounded-full"
+                              style={{ width: `${Math.min(100, pml.progress)}%` }}
+                            />
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="p-8 text-center text-slate-400 font-sans">
+                      Tidak ada data akumulasi petugas untuk filter PML terpilih.
+                    </td>
+                  </tr>
+                )}
+                
+                {/* Granular Table totals row at bottom */}
+                {pmlTableData.length > 0 && (
+                  <tr className="bg-blue-50/40 font-bold border-t border-blue-100">
+                    <td colSpan={1} className="p-3 pl-4 font-black font-sans uppercase text-slate-700">
+                      TOTAL {selectedPml === 'ALL' ? 'TIM GABUNGAN' : `TIM ${selectedPml.toUpperCase()}`}
+                    </td>
+                    <td className="p-3 text-center font-black text-slate-800">{bottomTableTotals.submit}</td>
+                    <td className="p-3 text-center font-black text-slate-400">{bottomTableTotals.draft}</td>
+                    <td className="p-3 text-center text-slate-700 font-black">{bottomTableTotals.mempawahTarget}</td>
+                    <td className="p-3 text-right pr-6 font-black text-blue-700 font-sans">
+                      <span className="font-extrabold text-blue-700 inline-block px-1.5 py-0.5 rounded bg-blue-100/50">{bottomTableTotals.progress}%</span>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          
+          {pmlTableData.length > 0 && totalPmlTablePages > 1 && (
+            <div className="p-3 bg-slate-50/70 border-t border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-slate-500 font-semibold">
+              <div>
+                Menampilkan <span className="text-slate-800 font-bold">{(pmlTablePage - 1) * 10 + 1}</span> - <span className="text-slate-800 font-bold">{Math.min(pmlTablePage * 10, pmlTableData.length)}</span> dari <span className="text-slate-800 font-bold">{pmlTableData.length}</span> supervisor
+              </div>
+              <div className="flex gap-1.5">
+                <button
+                  disabled={pmlTablePage === 1}
+                  onClick={() => setPmlTablePage(prev => Math.max(1, prev - 1))}
+                  className="px-2.5 py-1 bg-white border border-slate-250 rounded hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white text-slate-755 font-bold transition-all disabled:cursor-not-allowed cursor-pointer"
+                >
+                  Sebelumnya
+                </button>
+                <div className="flex items-center px-1 text-slate-700 font-sans font-bold text-[11px]">
+                  Halaman {pmlTablePage} / {totalPmlTablePages}
+                </div>
+                <button
+                  disabled={pmlTablePage === totalPmlTablePages}
+                  onClick={() => setPmlTablePage(prev => Math.min(totalPmlTablePages, prev + 1))}
                   className="px-2.5 py-1 bg-white border border-slate-250 rounded hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white text-slate-755 font-bold transition-all disabled:cursor-not-allowed cursor-pointer"
                 >
                   Selanjutnya
