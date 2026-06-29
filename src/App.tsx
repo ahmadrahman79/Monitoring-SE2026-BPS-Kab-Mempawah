@@ -106,6 +106,86 @@ function getWIBTargetDateStr(): string {
   return `${d} ${months[target.getMonth()]} ${y}`;
 }
 
+const SearchableSelect = ({ 
+  options, 
+  value, 
+  onChange, 
+  placeholder 
+}: { 
+  options: { label: string; value: string }[], 
+  value: string, 
+  onChange: (val: string) => void, 
+  placeholder: string 
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredOptions = useMemo(() => {
+    return options.filter(opt => opt.label.toLowerCase().includes(search.toLowerCase()));
+  }, [options, search]);
+
+  const selectedOption = options.find(o => o.value === value);
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <div 
+        className="bg-white border border-slate-200 rounded px-2 py-1 text-xs text-slate-700 hover:border-emerald-400 cursor-pointer flex justify-between items-center w-full min-h-[26px]"
+        onClick={() => {
+          setIsOpen(!isOpen);
+          if (!isOpen) setSearch("");
+        }}
+      >
+        <span className="truncate pr-2">{selectedOption ? selectedOption.label : placeholder}</span>
+        <ChevronDown size={12} className={`text-slate-400 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </div>
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded shadow-lg overflow-hidden">
+          <div className="p-1.5 border-b border-slate-100 bg-slate-50">
+            <input 
+              type="text" 
+              className="w-full px-2 py-1 text-xs border border-slate-200 rounded outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 bg-white"
+              placeholder="Cari..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              autoFocus
+            />
+          </div>
+          <div className="max-h-48 overflow-y-auto overscroll-contain">
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map((opt) => (
+                <div 
+                  key={opt.value}
+                  className={`px-2 py-1.5 text-xs cursor-pointer hover:bg-emerald-50 transition-colors ${opt.value === value ? 'bg-emerald-50/50 font-bold text-emerald-700' : 'text-slate-700'}`}
+                  onClick={() => {
+                    onChange(opt.value);
+                    setIsOpen(false);
+                  }}
+                >
+                  {opt.label}
+                </div>
+              ))
+            ) : (
+              <div className="px-2 py-3 text-xs text-slate-500 text-center italic">Tidak ditemukan</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const FALLBACK_REKAP_CSV = `"Nama PML","Nama PPL","Submit","Draf","Total","Target"
 "Sulis Tri Handayani","Eva Lutfianti","68","22","90","450"
 "Sulis Tri Handayani","Sri Ratna Dewi","56","0","56","440"
@@ -968,9 +1048,26 @@ export default function App() {
     setMempawahTablePage(1);
   }, [selectedMempawahPjFilter, selectedMempawahDesaFilter, selectedMempawahKecFilter, selectedMempawahSlsFilter, mempawahSortColumn, mempawahSortDirection]);
 
+  // Helper to count SLS per PPL based on parsed Mempawah records
+  const pplSlsCounts = useMemo(() => {
+    const counts: Record<string, Set<string>> = {};
+    parsedMempawahRecords.forEach(rec => {
+      if (!counts[rec.pplName]) counts[rec.pplName] = new Set();
+      counts[rec.pplName].add(`${rec.kecamatan}_${rec.desa}_${rec.sls}`);
+    });
+    const res: Record<string, number> = {};
+    for (const [ppl, slsSet] of Object.entries(counts)) {
+      res[ppl] = slsSet.size;
+    }
+    return res;
+  }, [parsedMempawahRecords]);
+
+  type PMLGroupItem = { pplName: string; submit: number; draft: number; total: number; progress: number; mempawahTarget: number; slsCount: number; cumulativeTarget: number };
+
   // Dynamic PML Groups for bottom recap comparison card tables
-  const pmlGroups = useMemo<Record<string, { pplName: string; submit: number; draft: number; total: number; progress: number; mempawahTarget: number }[]>>(() => {
-    const groups: Record<string, { pplName: string; submit: number; draft: number; total: number; progress: number; mempawahTarget: number }[]> = {};
+  const pmlGroups = useMemo<Record<string, PMLGroupItem[]>>(() => {
+    const groups: Record<string, PMLGroupItem[]> = {};
+    const elapsedDays = getCurrentDayOfPendataan();
     
     // Group table data by PML name from rekap data (parsedData.table1)
     parsedData.table1.forEach(rec => {
@@ -978,23 +1075,26 @@ export default function App() {
         groups[rec.pmlName] = [];
       }
       const recMempawahTarget = rec.mempawahTarget || rec.total;
+      const expectedCumulative = Math.ceil((recMempawahTarget / 62) * elapsedDays);
       groups[rec.pmlName].push({
         pplName: rec.pplName,
         submit: rec.submit,
         draft: rec.draft,
         total: rec.total,
         mempawahTarget: recMempawahTarget,
+        slsCount: pplSlsCounts[rec.pplName] || 0,
+        cumulativeTarget: expectedCumulative,
         progress: recMempawahTarget > 0 ? parseFloat(((rec.submit / recMempawahTarget) * 100).toFixed(1)) : 0
       });
     });
 
     return groups;
-  }, [parsedData.table1]);
+  }, [parsedData.table1, pplSlsCounts]);
 
   // Calculate Sub Totals for each PML group
   const pmlSubTotals = useMemo(() => {
     const totals: Record<string, { submit: number; draft: number; total: number; mempawahTarget: number; progress: number }> = {};
-    (Object.entries(pmlGroups) as [string, { pplName: string; submit: number; draft: number; total: number; progress: number; mempawahTarget: number }[]][]).forEach(([pmlName, list]) => {
+    (Object.entries(pmlGroups) as [string, PMLGroupItem[]][]).forEach(([pmlName, list]) => {
       let subSubmit = 0;
       let subDraft = 0;
       let subTotal = 0;
@@ -1019,7 +1119,7 @@ export default function App() {
   // Combine and sort data for the unified bottom table, filtered dynamically by selectedPml
   const bottomTableData = useMemo(() => {
     const list: { pmlName: string; pplName: string; submit: number; draft: number; total: number; progress: number; mempawahTarget: number }[] = [];
-    (Object.entries(pmlGroups) as [string, { pplName: string; submit: number; draft: number; total: number; progress: number; mempawahTarget: number }[]][]).forEach(([pmlName, ppls]) => {
+    (Object.entries(pmlGroups) as [string, PMLGroupItem[]][]).forEach(([pmlName, ppls]) => {
       if (selectedPml !== 'ALL' && pmlName !== selectedPml) {
         return;
       }
@@ -1066,7 +1166,7 @@ export default function App() {
     if (!targetTrackerPpl) return null;
     
     // Find in pmlGroups across all PMLs (unfiltered)
-    const entries = Object.entries(pmlGroups) as [string, { pplName: string; submit: number; draft: number; total: number; progress: number; mempawahTarget: number }[]][];
+    const entries = Object.entries(pmlGroups) as [string, PMLGroupItem[]][];
     for (const [pmlName, list] of entries) {
       const found = list.find(p => p.pplName === targetTrackerPpl);
       if (found) {
@@ -1096,9 +1196,11 @@ export default function App() {
       mempawahTarget: number;
       remainingTarget: number;
       dailyRequired: number;
+      slsCount: number;
+      cumulativeTarget: number;
     }[] = [];
     
-    const entries = Object.entries(pmlGroups) as [string, { pplName: string; submit: number; draft: number; total: number; progress: number; mempawahTarget: number }[]][];
+    const entries = Object.entries(pmlGroups) as [string, PMLGroupItem[]][];
     const remainingDays = getRemainingDaysToMempawahDeadline();
     
     entries.forEach(([pmlName, pplList]) => {
@@ -1117,7 +1219,9 @@ export default function App() {
           progress: p.progress,
           mempawahTarget: targetLimit,
           remainingTarget,
-          dailyRequired
+          dailyRequired,
+          slsCount: p.slsCount,
+          cumulativeTarget: p.cumulativeTarget
         });
       });
     });
@@ -1599,28 +1703,44 @@ export default function App() {
                             Supervisor: {ppl.pmlName}
                           </div>
                         </div>
-                        <div className="text-right shrink-0">
-                          <div className="text-[7.5px] text-slate-400 font-black uppercase tracking-wider leading-none">Progres target</div>
-                          <div className="text-xs font-black text-orange-600 font-mono mt-0.5">{ppl.progress}%</div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <div className="text-right">
+                            <div className="text-[7.5px] text-blue-400 font-black uppercase tracking-wider leading-none">Target Hari Ini</div>
+                            <div className="text-xs font-black text-blue-600 font-mono mt-0.5">
+                              {ppl.mempawahTarget > 0 ? ((ppl.cumulativeTarget / ppl.mempawahTarget) * 100).toFixed(1) : 0}%
+                            </div>
+                          </div>
+                          <div className="text-right border-l border-slate-200 pl-3">
+                            <div className="text-[7.5px] text-slate-400 font-black uppercase tracking-wider leading-none">Progres target</div>
+                            <div className="text-xs font-black text-orange-600 font-mono mt-0.5">{ppl.progress}%</div>
+                          </div>
                         </div>
                       </div>
 
                       {/* Horizontal progress bar */}
-                      <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden shadow-inner mt-2">
+                      <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden shadow-inner mt-2 relative">
                         <div 
-                          className="bg-linear-to-r from-orange-400 to-amber-500 h-full rounded-full transition-all duration-500"
+                          className="absolute top-0 bottom-0 bg-blue-400/30 border-r border-blue-500 z-0"
+                          style={{ width: `${ppl.mempawahTarget > 0 ? Math.min(100, (ppl.cumulativeTarget / ppl.mempawahTarget) * 100) : 0}%` }}
+                        />
+                        <div 
+                          className="bg-linear-to-r from-orange-400 to-amber-500 h-full rounded-full transition-all duration-500 relative z-10"
                           style={{ width: `${Math.min(100, ppl.progress)}%` }}
                         />
                       </div>
 
                       {/* Stats Breakdowns row */}
-                      <div className="grid grid-cols-4 gap-1.5 text-center mt-3">
+                      <div className="grid grid-cols-3 gap-1.5 text-center mt-3">
                         <div className="bg-white p-1.5 border border-slate-150 shadow-3xs rounded-md min-w-0">
-                          <div className="text-[7.5px] text-slate-400 uppercase font-black tracking-tight leading-none truncate">Target Buffer</div>
+                          <div className="text-[7.5px] text-slate-400 uppercase font-black tracking-tight leading-none truncate">Total SLS</div>
+                          <div className="text-xs font-black text-slate-850 font-mono mt-1">{ppl.slsCount}</div>
+                        </div>
+                        <div className="bg-white p-1.5 border border-slate-150 shadow-3xs rounded-md min-w-0">
+                          <div className="text-[7.5px] text-slate-400 uppercase font-black tracking-tight leading-none truncate">Target Akhir</div>
                           <div className="text-xs font-black text-slate-850 font-mono mt-1">{ppl.mempawahTarget}</div>
                         </div>
                         <div className="bg-white p-1.5 border border-slate-150 shadow-3xs rounded-md min-w-0">
-                          <div className="text-[7.5px] text-slate-400 uppercase font-black tracking-tight leading-none truncate">Telah Submit</div>
+                          <div className="text-[7.5px] text-emerald-600 uppercase font-black tracking-tight leading-none truncate">Telah Submit</div>
                           <div className="text-xs font-black text-emerald-600 font-mono mt-1">{ppl.submit}</div>
                         </div>
                         <div className="bg-white p-1.5 border border-slate-150 shadow-3xs rounded-md min-w-0">
@@ -1628,7 +1748,7 @@ export default function App() {
                           <div className="text-xs font-black text-amber-500 font-mono mt-1">{ppl.draft}</div>
                         </div>
                         <div className="bg-white p-1.5 border border-slate-150 shadow-3xs rounded-md min-w-0">
-                          <div className="text-[7.5px] text-slate-400 uppercase font-black tracking-tight leading-none truncate">Sisa Dokumen</div>
+                          <div className="text-[7.5px] text-red-500 uppercase font-black tracking-tight leading-none truncate">Sisa Dokumen</div>
                           <div className="text-xs font-black text-red-500 font-mono mt-1">{ppl.remainingTarget}</div>
                         </div>
                       </div>
@@ -2237,70 +2357,66 @@ export default function App() {
               {/* PJ filter */}
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide">Filter PJ:</span>
-                <select
+                <SearchableSelect
                   value={selectedMempawahPjFilter}
-                  onChange={(e) => { setSelectedMempawahPjFilter(e.target.value); setMempawahTablePage(1); }}
-                  className="bg-white border border-slate-200 rounded px-2 py-1 text-xs text-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/10 outline-hidden transition-all cursor-pointer w-full"
-                >
-                  <option value="ALL">Semua PJ</option>
-                  {mempawahFilters.pjs.map(pj => (
-                    <option key={pj} value={pj}>{pj}</option>
-                  ))}
-                </select>
+                  onChange={(val) => { setSelectedMempawahPjFilter(val); setMempawahTablePage(1); }}
+                  placeholder="Pilih PJ..."
+                  options={[
+                    { label: "Semua PJ", value: "ALL" },
+                    ...mempawahFilters.pjs.map(pj => ({ label: pj, value: pj }))
+                  ]}
+                />
               </div>
 
               {/* Kecamatan filter */}
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide">Filter Kecamatan:</span>
-                <select
+                <SearchableSelect
                   value={selectedMempawahKecFilter}
-                  onChange={(e) => {
-                    setSelectedMempawahKecFilter(e.target.value);
+                  onChange={(val) => {
+                    setSelectedMempawahKecFilter(val);
                     setSelectedMempawahDesaFilter('ALL');
                     setSelectedMempawahSlsFilter('ALL');
                     setMempawahTablePage(1);
                   }}
-                  className="bg-white border border-slate-200 rounded px-2 py-1 text-xs text-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/10 outline-hidden transition-all cursor-pointer w-full"
-                >
-                  <option value="ALL">Semua Kecamatan</option>
-                  {mempawahFilters.kecamatans.map(kec => (
-                    <option key={kec} value={kec}>{kec}</option>
-                  ))}
-                </select>
+                  placeholder="Pilih Kecamatan..."
+                  options={[
+                    { label: "Semua Kecamatan", value: "ALL" },
+                    ...mempawahFilters.kecamatans.map(kec => ({ label: kec, value: kec }))
+                  ]}
+                />
               </div>
 
               {/* Desa filter */}
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide">Filter Desa:</span>
-                <select
+                <SearchableSelect
                   value={selectedMempawahDesaFilter}
-                  onChange={(e) => {
-                    setSelectedMempawahDesaFilter(e.target.value);
+                  onChange={(val) => {
+                    setSelectedMempawahDesaFilter(val);
                     setSelectedMempawahSlsFilter('ALL');
                     setMempawahTablePage(1);
                   }}
-                  className="bg-white border border-slate-200 rounded px-2 py-1 text-xs text-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/10 outline-hidden transition-all cursor-pointer w-full"
-                >
-                  <option value="ALL">Semua Desa</option>
-                  {mempawahFilters.desas.map(desa => (
-                    <option key={desa} value={desa}>{desa}</option>
-                  ))}
-                </select>
+                  placeholder="Pilih Desa..."
+                  options={[
+                    { label: "Semua Desa", value: "ALL" },
+                    ...mempawahFilters.desas.map(desa => ({ label: desa, value: desa }))
+                  ]}
+                />
               </div>
 
               {/* SLS filter */}
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide">Filter SLS:</span>
-                <select
+                <SearchableSelect
                   value={selectedMempawahSlsFilter}
-                  onChange={(e) => { setSelectedMempawahSlsFilter(e.target.value); setMempawahTablePage(1); }}
-                  className="bg-white border border-slate-200 rounded px-2 py-1 text-xs text-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/10 outline-hidden transition-all cursor-pointer w-full"
-                >
-                  <option value="ALL">Semua SLS</option>
-                  {mempawahFilters.slss.map(sls => (
-                    <option key={sls} value={sls}>{sls}</option>
-                  ))}
-                </select>
+                  onChange={(val) => { setSelectedMempawahSlsFilter(val); setMempawahTablePage(1); }}
+                  placeholder="Pilih SLS..."
+                  options={[
+                    { label: "Semua SLS", value: "ALL" },
+                    ...mempawahFilters.slss.map(sls => ({ label: sls, value: sls }))
+                  ]}
+                />
               </div>
             </div>
           </div>
