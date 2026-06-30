@@ -481,9 +481,67 @@ export default function App() {
   }, [parsedData.pplList, targetTrackerPpl, selectedPml]);
 
   // Specifically use parsed 'rekap harian' Google Sheet for daily progress calculations
+  // Then append live today data from parsedData.table1
   const table3Calculated = useMemo(() => {
-    return parseRekapHarianCSV(rekapHarianCSV);
-  }, [rekapHarianCSV]);
+    const historical = parseRekapHarianCSV(rekapHarianCSV);
+    const activeDateStr = getWIBTargetDateStr();
+    const activeDateObj = parseIndonesianDate(activeDateStr);
+    
+    // Group historical by pplName to find their latest record
+    const latestPerPpl = new Map<string, PPLDailyProgress>();
+    historical.forEach(rec => {
+      const existing = latestPerPpl.get(rec.pplName);
+      if (!existing || rec.date.getTime() > existing.date.getTime()) {
+        latestPerPpl.set(rec.pplName, rec);
+      }
+    });
+
+    const liveRecords: PPLDailyProgress[] = [];
+    
+    parsedData.table1.forEach(livePpl => {
+      const latestHist = latestPerPpl.get(livePpl.pplName);
+      
+      if (latestHist) {
+        if (latestHist.dateStr !== activeDateStr) {
+          const dailySubmit = Math.max(0, livePpl.submit - latestHist.submit);
+          const dailyDraft = livePpl.draft - latestHist.draft;
+          const dailyTotal = Math.max(0, livePpl.total - latestHist.total);
+          
+          liveRecords.push({
+            pplName: livePpl.pplName,
+            pmlName: livePpl.pmlName,
+            mempawahTarget: livePpl.mempawahTarget || livePpl.total,
+            dateStr: `${activeDateStr} (Live)`,
+            date: activeDateObj,
+            submit: livePpl.submit,
+            draft: livePpl.draft,
+            total: livePpl.total,
+            dailySubmit,
+            dailyDraft,
+            dailyTotal,
+            isFirstDay: false
+          });
+        }
+      } else {
+        liveRecords.push({
+          pplName: livePpl.pplName,
+          pmlName: livePpl.pmlName,
+          mempawahTarget: livePpl.mempawahTarget || livePpl.total,
+          dateStr: `${activeDateStr} (Live)`,
+          date: activeDateObj,
+          submit: livePpl.submit,
+          draft: livePpl.draft,
+          total: livePpl.total,
+          dailySubmit: livePpl.submit,
+          dailyDraft: livePpl.draft,
+          dailyTotal: livePpl.total,
+          isFirstDay: true
+        });
+      }
+    });
+
+    return [...historical, ...liveRecords];
+  }, [rekapHarianCSV, parsedData.table1]);
 
 
 
