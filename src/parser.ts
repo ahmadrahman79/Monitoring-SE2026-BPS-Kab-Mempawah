@@ -632,6 +632,7 @@ export interface RekapMempawahRecord {
   draft: number;
   total: number;
   target: number;
+  open: number;
 }
 
 export const FALLBACK_REKAP_MEMPAWA_CSV = `"Kecamatan","Desa","SLS","PJ","Nama PPL","Nama PML","Submit","Draf","Total","Target"
@@ -711,7 +712,8 @@ export function parseRekapMempawahCSV(csvText: string): RekapMempawahRecord[] {
         submit,
         draft,
         total,
-        target
+        target,
+        open: Math.max(0, target - (submit + draft))
       });
     }
   }

@@ -485,10 +485,7 @@ export default function App() {
     return parseRekapHarianCSV(rekapHarianCSV);
   }, [rekapHarianCSV]);
 
-  // Parsed 'Progres Harian' Google Sheet
-  const progresHarianParsed = useMemo(() => {
-    return parseProgresHarianCSV(progresHarianCSV);
-  }, [progresHarianCSV]);
+
 
   // Combined and sorted date list from rekap harian + Progres Harian + active date from Google Sheets rekap
   const dateList = useMemo(() => {
@@ -499,11 +496,7 @@ export default function App() {
       if (rec.dateStr) datesSet.add(rec.dateStr);
     });
 
-    // Add dates from Progres Harian
-    progresHarianParsed.forEach(rec => {
-      if (rec.dateStr) datesSet.add(rec.dateStr);
-    });
-    
+    const datesArray = Array.from(datesSet);
     // Add active date from rekap
     const activeDate = getWIBTargetDateStr();
     datesSet.add(activeDate);
@@ -511,11 +504,11 @@ export default function App() {
     return Array.from(datesSet).sort((a, b) => {
       return parseIndonesianDate(b).getTime() - parseIndonesianDate(a).getTime();
     });
-  }, [table3Calculated, progresHarianParsed]);
+  }, [table3Calculated]);
 
-  // Apply selectors (PML, PPL, Date, Search Query) to the calculated daily deltas from Progres Harian for the bottom comparative log table
+  // Apply selectors (PML, PPL, Date, Search Query) to the calculated daily deltas from rekap harian for the bottom comparative log table
   const processedRecords = useMemo(() => {
-    let records = [...progresHarianParsed];
+    let records = [...table3Calculated];
 
     // Search query
     if (searchQuery.trim()) {
@@ -545,7 +538,7 @@ export default function App() {
     records.sort((a, b) => b.date.getTime() - a.date.getTime());
 
     return records;
-  }, [progresHarianParsed, selectedPml, selectedPpl, selectedDate, searchQuery]);
+  }, [table3Calculated, selectedPml, selectedPpl, selectedDate, searchQuery]);
 
   // Paginated daily logs
   const paginatedProcessedRecords = useMemo(() => {
@@ -580,11 +573,11 @@ export default function App() {
     });
     pplCount = activePpls.length;
 
-    // "Total Submit (Hari Ini / Filter) ambil data dari sheet Progres Harian"
+    // "Total Submit (Hari Ini / Filter) ambil data dari sheet rekap harian"
     let totalDailySubmit = 0;
     let totalDailyTotal = 0;
 
-    const dailyFiltered = progresHarianParsed.filter(rec => {
+    const dailyFiltered = table3Calculated.filter(rec => {
       if (selectedPml !== 'ALL' && rec.pmlName !== selectedPml) return false;
       if (selectedPpl !== 'ALL' && rec.pplName !== selectedPpl) return false;
       if (selectedDate !== 'ALL' && rec.dateStr !== selectedDate) return false;
@@ -636,7 +629,7 @@ export default function App() {
       dailyTotal: totalDailyTotal,
       pplCount: pplCount || 1
     };
-  }, [parsedData.table1, progresHarianParsed, table3Calculated, selectedPml, selectedPpl, selectedDate]);
+  }, [parsedData.table1, table3Calculated, selectedPml, selectedPpl, selectedDate]);
 
   // Find most active PPL based on average daily submits (using Google Sheets rekap cumulative submit)
   // "PPL Paling Aktif (Submit) ambil data dari sheet rekap"
@@ -703,12 +696,12 @@ export default function App() {
     return maxStr;
   }, [table3Calculated]);
 
-  // Find the latest available date from Progres Harian CSV
+  // Find the latest available date from rekap harian CSV
   const latestProgresHarianDate = useMemo(() => {
-    if (progresHarianParsed.length === 0) return '';
+    if (table3Calculated.length === 0) return '';
     let maxTime = -1;
     let maxStr = '';
-    progresHarianParsed.forEach(rec => {
+    table3Calculated.forEach(rec => {
       const t = rec.date.getTime();
       if (t > maxTime) {
         maxTime = t;
@@ -716,7 +709,7 @@ export default function App() {
       }
     });
     return maxStr;
-  }, [progresHarianParsed]);
+  }, [table3Calculated]);
 
   const activeProgresHarianDate = useMemo(() => {
     return selectedDate === 'ALL' ? latestProgresHarianDate : selectedDate;
@@ -726,7 +719,7 @@ export default function App() {
   // "Apresiasi Bintang Progres Teraktif Hari Ini ambil data dari sheet Progres Harian"
   const leadersData = useMemo(() => {
     if (!activeProgresHarianDate) return [];
-    const list = progresHarianParsed.filter(rec => rec.dateStr === activeProgresHarianDate);
+    const list = table3Calculated.filter(rec => rec.dateStr === activeProgresHarianDate);
     return list.map(rec => ({
       name: rec.pplName,
       pmlName: rec.pmlName,
@@ -734,7 +727,7 @@ export default function App() {
       draft: rec.dailyDraft,
       total: rec.dailyTotal
     }));
-  }, [progresHarianParsed, activeProgresHarianDate]);
+  }, [table3Calculated, activeProgresHarianDate]);
 
   const sortedLeaders = useMemo(() => {
     return [...leadersData].sort((a, b) => {
@@ -1028,14 +1021,16 @@ export default function App() {
     let draft = 0;
     let total = 0;
     let target = 0;
+    let open = 0;
     filteredMempawahRecords.forEach(rec => {
       submit += rec.submit;
       draft += rec.draft;
       total += rec.total;
       target += rec.target;
+      open += rec.open;
     });
     const progress = target > 0 ? parseFloat(((submit / target) * 100).toFixed(1)) : 0;
-    return { submit, draft, total, target, progress };
+    return { submit, draft, total, target, open, progress };
   }, [filteredMempawahRecords]);
 
   // Mempawah Table pagination
@@ -1065,7 +1060,7 @@ export default function App() {
     return res;
   }, [parsedMempawahRecords]);
 
-  type PMLGroupItem = { pplName: string; submit: number; draft: number; total: number; progress: number; mempawahTarget: number; slsCount: number; cumulativeTarget: number };
+  type PMLGroupItem = { pplName: string; submit: number; draft: number; total: number; progress: number; mempawahTarget: number; slsCount: number; cumulativeTarget: number; open: number };
 
   // Dynamic PML Groups for bottom recap comparison card tables
   const pmlGroups = useMemo<Record<string, PMLGroupItem[]>>(() => {
@@ -1085,6 +1080,7 @@ export default function App() {
         draft: rec.draft,
         total: rec.total,
         mempawahTarget: recMempawahTarget,
+        open: recMempawahTarget - (rec.submit + rec.draft),
         slsCount: pplSlsCounts[rec.pplName] || 0,
         cumulativeTarget: expectedCumulative,
         progress: recMempawahTarget > 0 ? parseFloat(((rec.submit / recMempawahTarget) * 100).toFixed(1)) : 0
@@ -1096,23 +1092,26 @@ export default function App() {
 
   // Calculate Sub Totals for each PML group
   const pmlSubTotals = useMemo(() => {
-    const totals: Record<string, { submit: number; draft: number; total: number; mempawahTarget: number; progress: number }> = {};
+    const totals: Record<string, { submit: number; draft: number; total: number; mempawahTarget: number; progress: number; open: number }> = {};
     (Object.entries(pmlGroups) as [string, PMLGroupItem[]][]).forEach(([pmlName, list]) => {
       let subSubmit = 0;
       let subDraft = 0;
       let subTotal = 0;
       let subMempawahTarget = 0;
+      let subOpen = 0;
       list.forEach(item => {
         subSubmit += item.submit;
         subDraft += item.draft;
         subTotal += item.total;
         subMempawahTarget += item.mempawahTarget || item.total;
+        subOpen += item.open;
       });
       totals[pmlName] = {
         submit: subSubmit,
         draft: subDraft,
         total: subTotal,
         mempawahTarget: subMempawahTarget,
+        open: subOpen,
         progress: subMempawahTarget > 0 ? parseFloat(((subSubmit / subMempawahTarget) * 100).toFixed(1)) : 0
       };
     });
@@ -1121,7 +1120,7 @@ export default function App() {
 
   // Combine and sort data for the unified bottom table, filtered dynamically by selectedPml
   const bottomTableData = useMemo(() => {
-    const list: { pmlName: string; pplName: string; submit: number; draft: number; total: number; progress: number; mempawahTarget: number }[] = [];
+    const list: { pmlName: string; pplName: string; submit: number; draft: number; total: number; progress: number; mempawahTarget: number; open: number }[] = [];
     (Object.entries(pmlGroups) as [string, PMLGroupItem[]][]).forEach(([pmlName, ppls]) => {
       if (selectedPml !== 'ALL' && pmlName !== selectedPml) {
         return;
@@ -1156,7 +1155,7 @@ export default function App() {
 
   // Combine and sort data for the new Per PML table
   const pmlTableData = useMemo(() => {
-    const list: { pmlName: string; submit: number; draft: number; total: number; progress: number; mempawahTarget: number }[] = [];
+    const list: { pmlName: string; submit: number; draft: number; total: number; progress: number; mempawahTarget: number; open: number }[] = [];
     (Object.entries(pmlSubTotals)).forEach(([pmlName, totals]) => {
       if (selectedPml !== 'ALL' && pmlName !== selectedPml) {
         return;
@@ -1550,7 +1549,7 @@ export default function App() {
 
 
         {/* Dynamic Filter Row */}
-        <div className="col-span-12 bg-white border border-slate-205 p-3 rounded-lg flex flex-wrap gap-3 items-center justify-between shadow-2xs">
+        <div className="col-span-12 bg-white/95 backdrop-blur-sm border border-slate-205 p-3 rounded-lg flex flex-wrap gap-3 items-center justify-between shadow-2xs sticky top-2 z-40">
           <div className="flex flex-wrap items-center gap-2.5">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
               <Filter size={11} /> Filter:
@@ -2177,6 +2176,9 @@ export default function App() {
                   <th className="p-3 text-center cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleBottomTableSort('mempawahTarget')}>
                     Target (Kolom F) {renderSortIcon('mempawahTarget')}
                   </th>
+                  <th className="p-3 text-center cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleBottomTableSort('open')}>
+                    Open {renderSortIcon('open')}
+                  </th>
                   <th className="p-3 text-right pr-6 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleBottomTableSort('progress')}>
                     Progres (%) {renderSortIcon('progress')}
                   </th>
@@ -2191,6 +2193,7 @@ export default function App() {
                       <td className="p-2.5 text-center font-bold text-slate-800">{ppl.submit}</td>
                       <td className="p-2.5 text-center text-slate-400">{ppl.draft}</td>
                       <td className="p-2.5 text-center">{ppl.mempawahTarget}</td>
+                      <td className="p-2.5 text-center font-bold text-rose-500">{ppl.open}</td>
                       <td className="p-2.5 text-right pr-6 font-bold text-blue-600">
                         <div className="inline-flex items-center gap-1.5 justify-end w-full">
                           <span className="text-[11px] font-bold text-slate-700">{ppl.progress}%</span>
@@ -2221,6 +2224,7 @@ export default function App() {
                     <td className="p-3 text-center font-black text-slate-800">{bottomTableTotals.submit}</td>
                     <td className="p-3 text-center font-black text-slate-400">{bottomTableTotals.draft}</td>
                     <td className="p-3 text-center text-slate-700 font-black">{bottomTableTotals.mempawahTarget}</td>
+                    <td className="p-3 text-center text-rose-600 font-black">{bottomTableTotals.open}</td>
                     <td className="p-3 text-right pr-6 font-black text-blue-700 font-sans">
                       <span className="font-extrabold text-blue-700 inline-block px-1.5 py-0.5 rounded bg-blue-100/50">{bottomTableTotals.progress}%</span>
                     </td>
@@ -2287,6 +2291,9 @@ export default function App() {
                   <th className="p-3 text-center cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handlePmlTableSort('mempawahTarget')}>
                     Target (Kolom F) {renderPmlSortIcon('mempawahTarget')}
                   </th>
+                  <th className="p-3 text-center cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handlePmlTableSort('open')}>
+                    Open {renderPmlSortIcon('open')}
+                  </th>
                   <th className="p-3 text-right pr-6 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handlePmlTableSort('progress')}>
                     Progres (%) {renderPmlSortIcon('progress')}
                   </th>
@@ -2300,6 +2307,7 @@ export default function App() {
                       <td className="p-2.5 text-center font-bold text-slate-800">{pml.submit}</td>
                       <td className="p-2.5 text-center text-slate-400">{pml.draft}</td>
                       <td className="p-2.5 text-center">{pml.mempawahTarget}</td>
+                      <td className="p-2.5 text-center font-bold text-rose-500">{pml.open}</td>
                       <td className="p-2.5 text-right pr-6 font-bold text-blue-600">
                         <div className="inline-flex items-center gap-1.5 justify-end w-full">
                           <span className="text-[11px] font-bold text-slate-700">{pml.progress}%</span>
@@ -2314,8 +2322,8 @@ export default function App() {
                     </tr>
                   ))
                 ) : (
-                  <tr>
-                    <td colSpan={5} className="p-8 text-center text-slate-400 font-sans">
+                    <tr>
+                    <td colSpan={6} className="p-8 text-center text-slate-400 font-sans">
                       Tidak ada data akumulasi petugas untuk filter PML terpilih.
                     </td>
                   </tr>
@@ -2330,6 +2338,7 @@ export default function App() {
                     <td className="p-3 text-center font-black text-slate-800">{bottomTableTotals.submit}</td>
                     <td className="p-3 text-center font-black text-slate-400">{bottomTableTotals.draft}</td>
                     <td className="p-3 text-center text-slate-700 font-black">{bottomTableTotals.mempawahTarget}</td>
+                    <td className="p-3 text-center text-rose-600 font-black">{bottomTableTotals.open}</td>
                     <td className="p-3 text-right pr-6 font-black text-blue-700 font-sans">
                       <span className="font-extrabold text-blue-700 inline-block px-1.5 py-0.5 rounded bg-blue-100/50">{bottomTableTotals.progress}%</span>
                     </td>
@@ -2599,7 +2608,7 @@ export default function App() {
           </div>
 
           {/* Quick Metrics Header */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 p-3 bg-emerald-50/40 border-b border-slate-100">
+          <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 p-3 bg-emerald-50/40 border-b border-slate-100">
             <div className="p-2 bg-white border border-emerald-100 rounded-md shadow-3xs">
               <span className="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider block">Total Submit</span>
               <span className="text-sm font-black text-slate-800 font-mono">{mempawahTotals.submit.toLocaleString('id-ID')}</span>
@@ -2615,6 +2624,10 @@ export default function App() {
             <div className="p-2 bg-white border border-emerald-100 rounded-md shadow-3xs">
               <span className="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider block">Total Target</span>
               <span className="text-sm font-black text-slate-800 font-mono">{mempawahTotals.target.toLocaleString('id-ID')}</span>
+            </div>
+            <div className="p-2 bg-white border border-emerald-100 rounded-md shadow-3xs">
+              <span className="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider block">Total Open</span>
+              <span className="text-sm font-black text-rose-600 font-mono">{mempawahTotals.open.toLocaleString('id-ID')}</span>
             </div>
             <div className="p-2 bg-white border border-emerald-100 rounded-md shadow-3xs col-span-2 sm:col-span-1">
               <span className="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider block">Rata Progres</span>
@@ -2653,6 +2666,9 @@ export default function App() {
                   <th className="p-3 text-center cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleMempawahTableSort('target')}>
                     Target {renderMempawahSortIcon('target')}
                   </th>
+                  <th className="p-3 text-center cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleMempawahTableSort('open')}>
+                    Open {renderMempawahSortIcon('open')}
+                  </th>
                   <th className="p-3 pr-4 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleMempawahTableSort('progress')}>
                     Progres {renderMempawahSortIcon('progress')}
                   </th>
@@ -2677,6 +2693,7 @@ export default function App() {
                         <td className="p-3 text-center font-mono font-bold text-amber-500 bg-amber-50/15">{rec.draft}</td>
                         <td className="p-3 text-center font-mono font-bold text-indigo-600 bg-indigo-50/15">{rec.total}</td>
                         <td className="p-3 text-center font-mono font-bold text-slate-500">{rec.target}</td>
+                        <td className="p-3 text-center font-mono font-bold text-rose-500">{rec.open}</td>
                         <td className="p-3 pr-4">
                           <div className="flex items-center gap-2 min-w-[100px]">
                             <div className="flex-1 bg-slate-100 h-2 rounded-full overflow-hidden">
